@@ -7,50 +7,46 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import os
+import re
 import sys
 from sklearn.cluster import AgglomerativeClustering
 from scipy.cluster.hierarchy import dendrogram
+
+PUNCT = r'.!?'
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 output_file = os.path.abspath(sys.argv[1])
 this_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(this_dir, "data")
 helper_dir = os.path.join(this_dir, "Supporting-Docs")
+
 if not os.path.exists(helper_dir):
     os.mkdir(helper_dir)
 
 
 def main():
     files = find_docs()
-    data = parse_docs()
+    data = []
+    for input_file in files:
+        lines = parse_docs(input_file)
+        data.append(lines)
     # score_matrix = find_distances(data)
     # plot_dendrogram(score_matrix)
     agglomerative(data)
 
 
 def find_docs():
-    return glob.glob(data/*)
+    return glob.glob(f"{data_dir}/*")
 
 
-def parse_docs():
+def parse_docs(input_file):
     with open(input_file, "r") as doc:
-        rows = [row.split(",") for row in doc]
-        header = rows[1] # The data is from Qualtrics. When I don't design the surveys with
-                         # meaningful short variables, row 1 is more meaningful than row 0.
-        data = rows[3:]  # But row 2 is almost always useless for my purposes, so skip to row 3.
+        lines = [line for line in doc if line[0] not in ["[", "1"]]
 
-    comment = header.index("Please provide any additional comments you would like to add here.")
-    session = header.index("session") - len(header)
-    # Indexing session this way works because the comment column comes before the session column
-    
-    data = [{"id": idx, "session": row[session].replace(r'"', ''), "comment": ",".join(row[comment:session]).replace(r'"', '')} \
-            for idx, row in enumerate(data) \
-            if len(",".join(row[comment:session-1])) > 0] # Putting session as the limit on comment works FOR THIS DATASET
-                                              # because session happens to come right after comment.
-                                              # I'm rejoining comments together, because I've split them up by
-                                              # commas: it was a csv.
-    
-    return data
+    lines = "".join(lines)
+    lines = re.split(f"{PUNCT}", lines)
+
+    return lines
 
 
 def find_distances(data):
@@ -95,8 +91,7 @@ def agglomerative(data):
             distance_threshold=1.5,
             )
 
-    corpus = [row["comment"] for row in data if len(row["comment"]) > 0]
-    corpus_embeddings = embedder.encode(corpus)
+    corpus_embeddings = embedder.encode(data)
     clustering_model.fit(corpus_embeddings)
     cluster_assignment = clustering_model.labels_
 
