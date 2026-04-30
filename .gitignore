@@ -219,3 +219,6 @@ __marimo__/
 IGNORE*
 data/*
 output.txt
+output.csv
+stuff.txt
+Supporting-Docs/
